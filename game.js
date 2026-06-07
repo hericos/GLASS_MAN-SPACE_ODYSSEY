@@ -10,7 +10,7 @@ const AudioSynth = (() => {
   let currentStep = 0;
   let activeAudioNodes = [];
   let musicType = null;
-  
+
   let musicVolume = 0.5;
   let sfxVolume = 0.7;
   let musicGainNode = null;
@@ -22,20 +22,20 @@ const AudioSynth = (() => {
   function init() {
     if (!ctx) {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
-      
+
       // Create separate gain nodes for volume control
       musicGainNode = ctx.createGain();
       musicGainNode.gain.setValueAtTime(musicVolume, ctx.currentTime);
       musicGainNode.connect(ctx.destination);
-      
+
       sfxGainNode = ctx.createGain();
       sfxGainNode.gain.setValueAtTime(sfxVolume, ctx.currentTime);
       sfxGainNode.connect(ctx.destination);
-      
+
       // Hook up UI range controls
       const sfxSlider = document.getElementById('volume-sfx');
       const musicSlider = document.getElementById('volume-music');
-      
+
       if (sfxSlider) {
         sfxVolume = parseFloat(sfxSlider.value);
         sfxGainNode.gain.setValueAtTime(sfxVolume, ctx.currentTime);
@@ -46,7 +46,7 @@ const AudioSynth = (() => {
           }
         });
       }
-      
+
       if (musicSlider) {
         musicVolume = parseFloat(musicSlider.value);
         musicGainNode.gain.setValueAtTime(musicVolume, ctx.currentTime);
@@ -73,121 +73,121 @@ const AudioSynth = (() => {
 
   function scheduleNote(step, time) {
     if (!ctx || !musicGainNode) return;
-    
+
     // Normal Room music
     if (musicType === 'normal') {
       // Treble arpeggiator (Triangle wave, soft, spacey)
       const treblePattern = [60, 63, 67, 70, 72, 70, 67, 63, 58, 62, 65, 68, 70, 68, 65, 62];
       const bassPattern = [36, null, null, null, 34, null, null, null, 32, null, null, null, 34, null, null, null];
-      
+
       const trebleNote = treblePattern[step % treblePattern.length];
       const bassNote = bassPattern[step % bassPattern.length];
-      
+
       // Play Treble
       if (trebleNote !== null) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         const filter = ctx.createBiquadFilter();
-        
+
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(midiToFreq(trebleNote), time);
-        
+
         // Lowpass filter for warm space feel
         filter.type = 'lowpass';
         filter.frequency.setValueAtTime(1200, time);
-        
+
         gain.gain.setValueAtTime(0.0, time);
         gain.gain.linearRampToValueAtTime(0.04, time + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
-        
+
         osc.connect(filter);
         filter.connect(gain);
         gain.connect(musicGainNode);
-        
+
         osc.start(time);
         osc.stop(time + 0.35);
-        
+
         activeAudioNodes.push({ osc, stopTime: time + 0.35 });
       }
-      
+
       // Play Bass
       if (bassNote !== null) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        
+
         osc.type = 'sine';
         osc.frequency.setValueAtTime(midiToFreq(bassNote), time);
-        
+
         gain.gain.setValueAtTime(0.0, time);
         gain.gain.linearRampToValueAtTime(0.08, time + 0.05);
         gain.gain.exponentialRampToValueAtTime(0.001, time + 0.8);
-        
+
         osc.connect(gain);
         gain.connect(musicGainNode);
-        
+
         osc.start(time);
         osc.stop(time + 0.85);
-        
+
         activeAudioNodes.push({ osc, stopTime: time + 0.85 });
       }
-    } 
+    }
     // Boss Room music (Faster, intense sawtooth synthwave)
     else if (musicType === 'boss') {
       const bassPattern = [36, 36, 48, 36, 39, 39, 51, 39, 41, 41, 53, 41, 43, 43, 55, 43];
       const treblePattern = [null, null, 72, null, null, null, 75, null, null, null, 77, null, 79, 80, 79, 77];
-      
+
       const bassNote = bassPattern[step % bassPattern.length];
       const trebleNote = treblePattern[step % treblePattern.length];
-      
+
       // Play driving bass
       if (bassNote !== null) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         const filter = ctx.createBiquadFilter();
-        
+
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(midiToFreq(bassNote), time);
-        
+
         filter.type = 'lowpass';
         filter.frequency.setValueAtTime(600, time);
-        
+
         // Punchy envelope
         gain.gain.setValueAtTime(0.0, time);
         gain.gain.linearRampToValueAtTime(0.08, time + 0.01);
         gain.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
-        
+
         osc.connect(filter);
         filter.connect(gain);
         gain.connect(musicGainNode);
-        
+
         osc.start(time);
         osc.stop(time + 0.2);
-        
+
         activeAudioNodes.push({ osc, stopTime: time + 0.2 });
       }
-      
+
       // Play high melody stabs
       if (trebleNote !== null) {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        
+
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(midiToFreq(trebleNote), time);
-        
+
         gain.gain.setValueAtTime(0.0, time);
         gain.gain.linearRampToValueAtTime(0.03, time + 0.01);
         gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
-        
+
         osc.connect(gain);
         gain.connect(musicGainNode);
-        
+
         osc.start(time);
         osc.stop(time + 0.3);
-        
+
         activeAudioNodes.push({ osc, stopTime: time + 0.3 });
       }
     }
-    
+
     // Clean up activeAudioNodes array periodically
     activeAudioNodes = activeAudioNodes.filter(nodeObj => {
       return nodeObj.stopTime > ctx.currentTime;
@@ -198,13 +198,13 @@ const AudioSynth = (() => {
     if (!ctx) return;
     while (nextNoteTime < ctx.currentTime + scheduleAheadTime) {
       scheduleNote(currentStep, nextNoteTime);
-      
+
       // Advance nextNoteTime based on tempo
       const bpm = musicType === 'boss' ? 140 : 110;
       const secondsPerBeat = 60.0 / bpm;
       // We are scheduling 16th notes (4 notes per beat)
       const noteLength = 0.25 * secondsPerBeat;
-      
+
       nextNoteTime += noteLength;
       currentStep++;
     }
@@ -213,15 +213,15 @@ const AudioSynth = (() => {
   function startMusic(type) {
     init();
     if (!ctx) return;
-    
+
     if (musicType === type) return; // already playing this music type
-    
+
     stopMusic();
-    
+
     musicType = type;
     nextNoteTime = ctx.currentTime + 0.05;
     currentStep = 0;
-    
+
     schedulerTimerId = setInterval(scheduler, lookahead);
   }
 
@@ -230,12 +230,12 @@ const AudioSynth = (() => {
       clearInterval(schedulerTimerId);
       schedulerTimerId = null;
     }
-    
+
     // Stop all active/scheduled oscillator nodes
     activeAudioNodes.forEach(nodeObj => {
       try {
         nodeObj.osc.stop();
-      } catch (e) {}
+      } catch (e) { }
     });
     activeAudioNodes = [];
     musicType = null;
@@ -249,7 +249,7 @@ const AudioSynth = (() => {
 
     try {
       const dest = sfxGainNode || ctx.destination;
-      
+
       switch (type) {
         case 'shoot': {
           const osc = ctx.createOscillator();
@@ -257,10 +257,10 @@ const AudioSynth = (() => {
           osc.type = 'triangle';
           osc.frequency.setValueAtTime(800, ctx.currentTime);
           osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.15);
-          
+
           gain.gain.setValueAtTime(0.15, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-          
+
           osc.connect(gain);
           gain.connect(dest);
           osc.start();
@@ -273,10 +273,10 @@ const AudioSynth = (() => {
           osc.type = 'sawtooth';
           osc.frequency.setValueAtTime(180, ctx.currentTime);
           osc.frequency.linearRampToValueAtTime(40, ctx.currentTime + 0.25);
-          
+
           gain.gain.setValueAtTime(0.3, ctx.currentTime);
           gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.25);
-          
+
           osc.connect(gain);
           gain.connect(dest);
           osc.start();
@@ -293,10 +293,10 @@ const AudioSynth = (() => {
             const baseFreq = 1200 + Math.random() * 2000;
             osc.frequency.setValueAtTime(baseFreq, ctx.currentTime + delay);
             osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + delay + 0.2);
-            
+
             gain.gain.setValueAtTime(0.12, ctx.currentTime + delay);
             gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + 0.2);
-            
+
             osc.connect(gain);
             gain.connect(dest);
             osc.start(ctx.currentTime + delay);
@@ -310,10 +310,10 @@ const AudioSynth = (() => {
           osc.type = 'sawtooth';
           osc.frequency.setValueAtTime(300, ctx.currentTime);
           osc.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.2);
-          
+
           gain.gain.setValueAtTime(0.2, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-          
+
           osc.connect(gain);
           gain.connect(dest);
           osc.start();
@@ -328,15 +328,15 @@ const AudioSynth = (() => {
           osc.type = 'sawtooth';
           osc.frequency.setValueAtTime(100, ctx.currentTime);
           osc.frequency.linearRampToValueAtTime(20, ctx.currentTime + dur);
-          
+
           gain.gain.setValueAtTime(0.5, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-          
+
           osc.connect(gain);
           gain.connect(dest);
           osc.start();
           osc.stop(ctx.currentTime + dur);
-          
+
           // Crackling high pitch debris
           for (let i = 0; i < 15; i++) {
             const delay = Math.random() * dur;
@@ -360,10 +360,10 @@ const AudioSynth = (() => {
           osc.type = 'sine';
           osc.frequency.setValueAtTime(300, ctx.currentTime);
           osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.4);
-          
+
           gain.gain.setValueAtTime(0.15, ctx.currentTime);
           gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
-          
+
           osc.connect(gain);
           gain.connect(dest);
           osc.start();
@@ -480,24 +480,24 @@ window.addEventListener('DOMContentLoaded', () => {
   if (savedName && nameInput) {
     nameInput.value = savedName;
   }
-  
+
   // Initialize cheat items grid buttons
   initCheatMenu();
-  
+
   // Health Bar / Life HUD click detector for Easter Egg
   const healthHud = document.getElementById('health-hud-panel');
   if (healthHud) {
     healthHud.addEventListener('click', () => {
       if (gameState !== STATE.PLAYING) return;
       if (!playerName || playerName.toLowerCase() !== 'easteregger') return;
-      
+
       healthBarClicks++;
-      
+
       clearTimeout(healthBarClickTimeout);
       healthBarClickTimeout = setTimeout(() => {
         healthBarClicks = 0;
       }, 3000);
-      
+
       if (healthBarClicks >= 10) {
         healthBarClicks = 0;
         clearTimeout(healthBarClickTimeout);
@@ -566,7 +566,7 @@ const ARENA = {
 // --- Keyboard Event Listeners ---
 window.addEventListener('keydown', (e) => {
   keys[e.key.toLowerCase()] = true;
-  
+
   if (e.key.toLowerCase() === 'p' && gameState === STATE.PLAYING) {
     pauseGame();
   } else if (e.key.toLowerCase() === 'p' && gameState === STATE.PAUSED) {
@@ -614,13 +614,13 @@ async function submitScore(points) {
     console.warn("Player name or ID not set. Cannot submit score.");
     return;
   }
-  
+
   // Protect the leaderboard by skipping saving scores for the cheat pilot name
   if (playerName.toLowerCase() === 'easteregger') {
     console.log("Cheat pilot name detected. Skipping score submission.");
     return;
   }
-  
+
   try {
     const response = await fetch('https://n8n.grupodailydeals.tech/webhook/salvar-pontuacao', {
       method: 'POST',
@@ -648,37 +648,37 @@ async function showLeaderboard() {
   document.getElementById('game-over-screen').classList.add('hidden');
   document.getElementById('victory-screen').classList.add('hidden');
   document.getElementById('pause-screen').classList.add('hidden');
-  
+
   // Show leaderboard screen
   const lbScreen = document.getElementById('leaderboard-screen');
   lbScreen.classList.remove('hidden');
-  
+
   const loadingEl = document.getElementById('leaderboard-loading');
   const tableEl = document.getElementById('leaderboard-container');
   const tbody = document.getElementById('leaderboard-body');
-  
+
   loadingEl.classList.remove('hidden');
   loadingEl.innerHTML = 'Carregando ranking...';
   tableEl.classList.add('hidden');
   tbody.innerHTML = '';
-  
+
   try {
     const response = await fetch('https://n8n.grupodailydeals.tech/webhook/ranking');
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const data = await response.json();
-    
+
     // Sort descending by points
     data.sort((a, b) => {
       const pA = parseFloat(a.points) || 0;
       const pB = parseFloat(b.points) || 0;
       return pB - pA;
     });
-    
+
     // Take Top 10
     const top10 = data.slice(0, 10);
-    
+
     // Render rows
     if (top10.length === 0) {
       const row = document.createElement('tr');
@@ -687,20 +687,20 @@ async function showLeaderboard() {
     } else {
       top10.forEach((item, index) => {
         const row = document.createElement('tr');
-        
+
         // Highlight current player's entry if matching
-        const isCurrentPlayer = (item.userId && String(item.userId) === String(playerId)) || 
-                                (item.name === playerName && (parseFloat(item.points) === score || score === 0));
+        const isCurrentPlayer = (item.userId && String(item.userId) === String(playerId)) ||
+          (item.name === playerName && (parseFloat(item.points) === score || score === 0));
         if (isCurrentPlayer) {
           row.classList.add('current-player-row');
         }
-        
+
         const rank = index + 1;
         let rankBadge = `${rank}`;
         if (rank === 1) rankBadge = '🥇';
         else if (rank === 2) rankBadge = '🥈';
         else if (rank === 3) rankBadge = '🥉';
-        
+
         row.innerHTML = `
           <td class="rank-col">${rankBadge}</td>
           <td class="name-col">${escapeHTML(item.name)}</td>
@@ -709,10 +709,10 @@ async function showLeaderboard() {
         tbody.appendChild(row);
       });
     }
-    
+
     // Check if current player is in Top 10
-    const isInTop10 = top10.some(item => (item.userId && String(item.userId) === String(playerId)) || 
-                                         (item.name === playerName && (parseFloat(item.points) === score || score === 0)));
+    const isInTop10 = top10.some(item => (item.userId && String(item.userId) === String(playerId)) ||
+      (item.name === playerName && (parseFloat(item.points) === score || score === 0)));
     if (isInTop10 && score > 0) {
       const titleEl = document.querySelector('#leaderboard-screen h2');
       if (titleEl && !titleEl.innerHTML.includes('🎉')) {
@@ -733,7 +733,7 @@ async function showLeaderboard() {
   } catch (error) {
     console.error("Failed to load ranking:", error);
     loadingEl.innerHTML = `<span class="danger-text">Erro ao carregar ranking.</span><br><button id="leaderboard-retry-btn" class="glow-btn" style="margin-top: 15px; padding: 10px 20px;">Tentar Novamente</button>`;
-    
+
     const retryBtn = document.getElementById('leaderboard-retry-btn');
     if (retryBtn) {
       retryBtn.addEventListener('click', showLeaderboard);
@@ -743,7 +743,7 @@ async function showLeaderboard() {
 
 function escapeHTML(str) {
   if (!str) return '';
-  return str.replace(/[&<>'"]/g, 
+  return str.replace(/[&<>'"]/g,
     tag => ({
       '&': '&amp;',
       '<': '&lt;',
@@ -759,7 +759,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
   const nameInput = document.getElementById('player-name-input');
   const nameError = document.getElementById('name-error-msg');
   const startBtn = document.getElementById('start-btn');
-  
+
   if (!nameInput || !nameInput.value.trim()) {
     if (nameError) nameError.classList.remove('hidden');
     if (nameInput) nameInput.classList.add('input-error');
@@ -771,18 +771,18 @@ document.getElementById('start-btn').addEventListener('click', () => {
     }
     return;
   }
-  
+
   if (nameError) nameError.classList.add('hidden');
   if (nameInput) nameInput.classList.remove('input-error');
-  
+
   const selectedName = nameInput.value.trim();
   localStorage.setItem('glassman_player_name', selectedName);
-  
+
   // Show loading state
   startBtn.disabled = true;
   startBtn.innerText = "REGISTRANDO PILOTO...";
   nameInput.disabled = true;
-  
+
   registerPlayer(selectedName).then(() => {
     startBtn.disabled = false;
     startBtn.innerText = "INICIAR JORNADA";
@@ -823,7 +823,7 @@ function startGame() {
   roomIndex = 1;
   floorIndex = 1;
   roomCleared = false;
-  
+
   // Reset lists
   enemies = [];
   projectiles = [];
@@ -831,7 +831,7 @@ function startGame() {
   particles = [];
   items = [];
   floatTexts = [];
-  
+
   // Initialize player (Glass Man)
   player = {
     x: WIDTH / 2,
@@ -848,14 +848,14 @@ function startGame() {
     crackedAmount: 0,
     invulFrames: 0,
     color: '#00f0ff',
-    
+
     // Upgrades stats
     helperCount: 0,
     shotCount: 1,
-    luckFactor: 0.15,
+    luckFactor: 0.05,
     petCount: 0,
     petAngle: 0,
-    
+
     // New mechanics
     hasShield: false,
     tripleShotTimer: 0
@@ -927,7 +927,7 @@ function closeCheatMenu() {
 function initCheatMenu() {
   const grid = document.getElementById('cheat-items-grid');
   if (!grid) return;
-  
+
   grid.innerHTML = '';
   const powerUps = [
     { type: 'heart', label: 'Cristal de Vida', color: '#00f0ff' },
@@ -943,7 +943,7 @@ function initCheatMenu() {
     { type: 'shield', label: 'Escudo de Vidro', color: '#00f0ff' },
     { type: 'tripleshot', label: 'Tiro Triplo Temporal', color: '#e040fb' }
   ];
-  
+
   powerUps.forEach(item => {
     const btn = document.createElement('button');
     btn.className = 'cheat-btn';
@@ -959,33 +959,33 @@ function initCheatMenu() {
 
 function spawnCheatPowerUp(type) {
   if (gameState !== STATE.CHEAT || !player) return;
-  
+
   // Calculate spawn coordinates close to the player
   // Default offset: 45px to the right of the player, clamped inside ARENA
   const offset = 45;
   let spawnX = player.x + offset;
   let spawnY = player.y;
-  
+
   // Clamp coordinates within ARENA bounds with 20px padding from the walls
   const minX = ARENA.x + 20;
   const maxX = ARENA.x + ARENA.w - 20;
   const minY = ARENA.y + 20;
   const maxY = ARENA.y + ARENA.h - 20;
-  
+
   if (spawnX > maxX) {
     spawnX = player.x - offset; // Try left side
   }
-  
+
   // Final clamping
   spawnX = Math.max(minX, Math.min(maxX, spawnX));
   spawnY = Math.max(minY, Math.min(maxY, spawnY));
-  
+
   // Spawn the item
   spawnPowerUp(spawnX, spawnY, type);
-  
+
   // Floating text feedback
   addFloatText(spawnX, spawnY - 15, "MATERIALIZADO!", '#ff007f', 12);
-  
+
   // Close the secret menu and resume gameplay
   closeCheatMenu();
 }
@@ -993,7 +993,7 @@ function spawnCheatPowerUp(type) {
 function triggerGameOver() {
   gameState = STATE.GAMEOVER;
   document.body.classList.remove('lock-scroll');
-  
+
   // Check record before updating it
   const isNewRecord = (score > highScore);
   if (isNewRecord) {
@@ -1010,7 +1010,7 @@ function triggerGameOver() {
   if (mobileControls) mobileControls.classList.remove('visible');
   AudioSynth.stopMusic();
   AudioSynth.play('shatter');
-  
+
   // Submit score in background
   submitScore(score);
 }
@@ -1018,7 +1018,7 @@ function triggerGameOver() {
 function triggerVictory() {
   gameState = STATE.VICTORY;
   document.body.classList.remove('lock-scroll');
-  
+
   // Check record before updating it
   const isNewRecord = (score > highScore);
   if (isNewRecord) {
@@ -1035,7 +1035,7 @@ function triggerVictory() {
   if (mobileControls) mobileControls.classList.remove('visible');
   AudioSynth.stopMusic();
   AudioSynth.play('powerup');
-  
+
   // Submit score in background
   submitScore(score);
 }
@@ -1049,7 +1049,7 @@ function spawnRoomEnemies() {
   doors = [];
 
   const currentFloor = FLOORS[(floorIndex - 1) % FLOORS.length];
-  
+
   // Floating text indicating the room/floor
   const isBossRoom = roomIndex === 3;
   addFloatText(WIDTH / 2, HEIGHT / 2 - 50, isBossRoom ? `CONFRONTO: ${currentFloor.name.toUpperCase()}` : `${currentFloor.name} - SALA ${roomIndex}`, isBossRoom ? '#ff007f' : '#00f0ff', 24);
@@ -1144,10 +1144,10 @@ function spawnEnemy(type) {
 function spawnBoss(floor) {
   const currentFloor = FLOORS[(floor - 1) % FLOORS.length];
   const subtype = currentFloor.bossType;
-  
+
   let color = '#ff007f';
   let health = 25 + floor * 15;
-  
+
   if (subtype === 'kraken') {
     color = '#ff9800';
     health = 35 + floor * 15;
@@ -1213,7 +1213,7 @@ function update(dt) {
       p.life -= dt;
     });
     particles = particles.filter(p => p.life > 0);
-    
+
     // Update float texts
     floatTexts.forEach(t => {
       t.y -= 0.5;
@@ -1353,7 +1353,7 @@ function update(dt) {
     p.x += p.vx;
     p.y += p.vy;
     p.life -= dt;
-    
+
     // Bounce off walls once, or break
     if (p.x - p.radius < ARENA.x || p.x + p.radius > ARENA.x + ARENA.w) {
       if (p.bounces > 0) {
@@ -1423,7 +1423,7 @@ function update(dt) {
         fireEnemyProjectile(enemy, angle);
         enemy.shootCooldown = 1500 + Math.random() * 1000;
       }
-    } 
+    }
     else if (enemy.type === 'dasher') {
       if (enemy.isDashing) {
         enemy.x += enemy.dashVx;
@@ -1491,7 +1491,7 @@ function update(dt) {
           const dist = 120 + Math.random() * 60;
           enemy.x = Math.max(ARENA.x + enemy.radius, Math.min(ARENA.x + ARENA.w - enemy.radius, player.x + Math.cos(ang) * dist));
           enemy.y = Math.max(ARENA.y + enemy.radius, Math.min(ARENA.y + ARENA.h - enemy.radius, player.y + Math.sin(ang) * dist));
-          
+
           spawnSlimeParticles(enemy.x, enemy.y, 8, enemy.color);
 
           const baseSpeed = 2.8;
@@ -1524,7 +1524,7 @@ function update(dt) {
     else if (enemy.type === 'boss') {
       // Boss pattern
       enemy.patternTimer += dt;
-      
+
       // Gentle floating in arena center
       const targetX = WIDTH / 2 + Math.sin(enemy.patternTimer / 1000) * 120;
       const targetY = HEIGHT / 2 - 100 + Math.cos(enemy.patternTimer / 1500) * 40;
@@ -1548,12 +1548,12 @@ function update(dt) {
       const dist = Math.hypot(proj.x - enemy.x, proj.y - enemy.y);
       if (dist < proj.radius + enemy.radius) {
         proj.life = 0; // Destroy projectile
-        
+
         // Defense reduces damage (minimum of 0.5 damage)
         const def = enemy.defense || 0;
         const actualDamage = Math.max(0.5, proj.damage - def);
         enemy.health -= actualDamage;
-        
+
         // Spawn hit particle effect
         spawnGlassParticles(proj.x, proj.y, 6, proj.vx * -0.3, proj.vy * -0.3);
         spawnSlimeParticles(enemy.x, enemy.y, 4, enemy.color);
@@ -1569,14 +1569,14 @@ function update(dt) {
           const pointsEarned = enemy.value * comboMultiplier;
           score += pointsEarned;
           updateHUD();
-          
+
           addFloatText(enemy.x, enemy.y - 20, `+${pointsEarned}`, enemy.color, 18);
           if (comboMultiplier > 1) {
             addFloatText(enemy.x, enemy.y - 35, `Combo x${comboMultiplier}!`, '#ff007f', 13);
           }
-          
+
           spawnSlimeParticles(enemy.x, enemy.y, 15, enemy.color, true);
-          
+
           if (enemy.isBoss) {
             AudioSynth.play('boss_death');
             screenShake = 15;
@@ -1683,7 +1683,7 @@ function update(dt) {
 function fireProjectile(vx, vy) {
   const baseAngle = Math.atan2(vy, vx);
   const isTriple = player.tripleShotTimer > 0;
-  
+
   if (player.shotCount === 1 && !isTriple) {
     projectiles.push({
       x: player.x,
@@ -1795,7 +1795,7 @@ function executeBossAttack(boss) {
       }
       boss.shootCooldown = 1500;
     }
-  } 
+  }
   else if (subtype === 'kraken') {
     if (boss.attackPattern === 0) {
       // Spiral fire pattern
@@ -1854,7 +1854,7 @@ function executeBossAttack(boss) {
       }
       boss.shootCooldown = 2000;
     }
-  } 
+  }
   else if (subtype === 'voidlord') {
     if (boss.attackPattern === 0) {
       // Seeking void orbs
@@ -1892,14 +1892,14 @@ function executeBossAttack(boss) {
       // Teleport and radial blast
       const targetX = ARENA.x + 100 + Math.random() * (ARENA.w - 200);
       const targetY = ARENA.y + 100 + Math.random() * (ARENA.h - 200);
-      
+
       spawnSlimeParticles(boss.x, boss.y, 20, boss.color, true);
       boss.x = targetX;
       boss.y = targetY;
       spawnSlimeParticles(boss.x, boss.y, 20, boss.color, true);
-      
+
       addFloatText(boss.x, boss.y - 30, "TELEPORTE!", '#bc13fe', 16);
-      
+
       // Blast ring
       const count = 10;
       for (let i = 0; i < count; i++) {
@@ -1929,7 +1929,7 @@ function damagePlayer(amount = 1) {
     addFloatText(player.x, player.y - 25, "Escudo Bloqueou!", '#00f0ff', 16);
     spawnGlassParticles(player.x, player.y, 15, 0, 0, true);
     AudioSynth.play('shatter');
-    
+
     // Shoot shards in 8 directions
     for (let a = 0; a < 8; a++) {
       const angle = (a / 8) * Math.PI * 2;
@@ -1957,7 +1957,7 @@ function damagePlayer(amount = 1) {
   player.health -= finalDamage;
   player.invulFrames = 1200; // 1.2s invulnerability
   screenShake = 12;
-  
+
   // Cracks effect indicator
   player.crackedAmount = Math.min(1, Math.max(0, 1 - (player.health / player.maxHealth)));
 
@@ -1978,10 +1978,10 @@ function damagePlayer(amount = 1) {
 function spawnPowerUp(x, y, specificType = null) {
   const types = ['heart', 'damage', 'speed', 'firerate', 'range', 'defense', 'helper', 'multishot', 'luck', 'pet', 'shield', 'tripleshot'];
   const type = specificType || types[Math.floor(Math.random() * types.length)];
-  
+
   let color = '#fff';
   let label = '';
-  
+
   if (type === 'heart') { color = '#00f0ff'; label = 'Cristal de Vida'; }
   else if (type === 'damage') { color = '#ff007f'; label = 'Estilhaço Afiado'; }
   else if (type === 'speed') { color = '#39ff14'; label = 'Polimento de Vidro'; }
@@ -2007,7 +2007,7 @@ function spawnPowerUp(x, y, specificType = null) {
 
 function applyItem(item) {
   AudioSynth.play('powerup');
-  
+
   if (item.type === 'heart') {
     player.health = Math.min(player.maxHealth, player.health + 2); // heal 1 heart (2 hp)
     addFloatText(player.x, player.y - 20, "+Vida", item.color, 16);
@@ -2025,20 +2025,20 @@ function applyItem(item) {
     player.bulletSpeed += 1;
     addFloatText(player.x, player.y - 20, "+Alcance", item.color, 16);
   } else if (item.type === 'defense') {
-    player.maxHealth += 2;
+    player.maxHealth = Math.min(14, player.maxHealth + 2);
     player.health += 2;
     addFloatText(player.x, player.y - 20, "+Max Defesa", item.color, 16);
   } else if (item.type === 'helper') {
-    player.helperCount += 1;
+    player.helperCount = Math.min(3, player.helperCount + 1);
     addFloatText(player.x, player.y - 20, "+Ajudante de Vidro", item.color, 16);
   } else if (item.type === 'multishot') {
     player.shotCount += 1;
     addFloatText(player.x, player.y - 20, "+Fragmentação", item.color, 16);
   } else if (item.type === 'luck') {
-    player.luckFactor = Math.min(0.75, player.luckFactor + 0.15);
+    player.luckFactor = Math.min(0.3, player.luckFactor + 0.05);
     addFloatText(player.x, player.y - 20, "+Sorte", item.color, 16);
   } else if (item.type === 'pet') {
-    player.petCount += 1;
+    player.petCount = Math.min(3, player.petCount + 1);
     addFloatText(player.x, player.y - 20, "+Escudo Orbital", item.color, 16);
   } else if (item.type === 'shield') {
     player.hasShield = true;
@@ -2047,7 +2047,7 @@ function applyItem(item) {
     player.tripleShotTimer = 10000; // 10s
     addFloatText(player.x, player.y - 20, "+Tiro Triplo", item.color, 16);
   }
-  
+
   player.crackedAmount = 1 - (player.health / player.maxHealth);
   updateHUD();
 }
@@ -2197,19 +2197,19 @@ function draw() {
   // Draw Player (Glass Man)
   if (player && gameState !== STATE.GAMEOVER) {
     ctx.save();
-    
+
     // Invulnerability blink effect
     if (player.invulFrames > 0 && Math.floor(player.invulFrames / 100) % 2 === 0) {
       ctx.globalAlpha = 0.3;
     }
 
     // No shadow blur for performance
-    
+
     // Draw Glass body panels
     ctx.strokeStyle = player.color;
     ctx.lineWidth = 2.5;
     ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
-    
+
     // Determine movement direction & shooting aim direction
     let moveDx = 0;
     let moveDy = 0;
@@ -2237,11 +2237,11 @@ function draw() {
       else if (keys['arrowleft']) aimDx = -1;
       else if (keys['arrowright']) aimDx = 1;
     }
-    
+
     // 1. Draw Legs (Walking animation)
     const cycle = player.walkCycle || 0;
     const legSwing = Math.sin(cycle) * 8;
-    
+
     // Left Leg
     ctx.beginPath();
     ctx.moveTo(player.x - 5, player.y + 6);
@@ -2276,7 +2276,7 @@ function draw() {
       // Extends pointing arm in shooting direction
       ctx.moveTo(player.x - 6, player.y - 5);
       ctx.lineTo(player.x + aimDx * 15, player.y - 5 + aimDy * 12);
-      
+
       ctx.moveTo(player.x + 6, player.y - 5);
       ctx.lineTo(player.x + aimDx * 15, player.y - 5 + aimDy * 12);
     } else {
@@ -2284,7 +2284,7 @@ function draw() {
       const armSwing = Math.cos(cycle) * 6;
       ctx.moveTo(player.x - 7, player.y - 5);
       ctx.lineTo(player.x - 11, player.y + armSwing);
-      
+
       ctx.moveTo(player.x + 7, player.y - 5);
       ctx.lineTo(player.x + 11, player.y - armSwing);
     }
@@ -2302,12 +2302,12 @@ function draw() {
     }
 
     ctx.fillStyle = '#ffffff';
-    
+
     // Left eye
     ctx.beginPath();
     ctx.arc(player.x - 2.5 + lookX, player.y - 14.5 + lookY, 1.2, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // Right eye
     ctx.beginPath();
     ctx.arc(player.x + 2.5 + lookX, player.y - 14.5 + lookY, 1.2, 0, Math.PI * 2);
@@ -2318,12 +2318,12 @@ function draw() {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.82)';
       ctx.lineWidth = 1.1;
       ctx.beginPath();
-      
+
       const seedRandom = (seed) => {
         const x = Math.sin(seed) * 10000;
         return x - Math.floor(x);
       };
-      
+
       const crackLines = Math.floor(player.crackedAmount * 8);
       for (let j = 0; j < crackLines; j++) {
         // Torso cracks (branching & jagged)
@@ -2338,7 +2338,7 @@ function draw() {
           cx += Math.cos(ang) * len;
           cy += Math.sin(ang) * len;
           ctx.lineTo(cx, cy);
-          
+
           // Small branch
           if (seedRandom(j * 4 + s + 7) > 0.6) {
             ctx.moveTo(cx, cy);
@@ -2348,7 +2348,7 @@ function draw() {
             ctx.moveTo(cx, cy);
           }
         }
-        
+
         // Head cracks (branching & jagged)
         ctx.moveTo(player.x, player.y - 14);
         cx = player.x;
@@ -2361,7 +2361,7 @@ function draw() {
           cx += Math.cos(ang) * len;
           cy += Math.sin(ang) * len;
           ctx.lineTo(cx, cy);
-          
+
           if (seedRandom(j * 4 + s + 15) > 0.65) {
             ctx.moveTo(cx, cy);
             let branchAng = ang + (seedRandom(j * 4 + s + 16) - 0.5) * 1.3;
@@ -2426,13 +2426,13 @@ function draw() {
       ctx.fillStyle = 'rgba(233, 30, 99, 0.45)';
       ctx.strokeStyle = '#e91e63';
       ctx.lineWidth = 1.2;
-      
+
       // Mini head
       ctx.beginPath();
       ctx.arc(hx, hy - 4, 3, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      
+
       // Mini body
       ctx.beginPath();
       ctx.moveTo(hx - 3, hy - 1);
@@ -2453,7 +2453,7 @@ function draw() {
     ctx.save();
     ctx.fillStyle = enemy.color;
 
-     if (enemy.type === 'floater') {
+    if (enemy.type === 'floater') {
       // 1. Draw Spaceship Saucer Base (Silver/Grey)
       ctx.fillStyle = '#607d8b';
       ctx.strokeStyle = '#cfd8dc';
@@ -2475,19 +2475,19 @@ function draw() {
       ctx.strokeStyle = '#39ff14';
       ctx.lineWidth = 2.0;
       const wave = Math.sin((enemy.shootCooldown || 0) * 0.05) * 3;
-      
+
       // Left tentacle
       ctx.beginPath();
       ctx.moveTo(enemy.x - 5, enemy.y + 5);
       ctx.quadraticCurveTo(enemy.x - 9 + wave, enemy.y + 11, enemy.x - 6, enemy.y + 15);
       ctx.stroke();
-      
+
       // Center tentacle
       ctx.beginPath();
       ctx.moveTo(enemy.x, enemy.y + 5);
       ctx.quadraticCurveTo(enemy.x - wave, enemy.y + 12, enemy.x + wave, enemy.y + 16);
       ctx.stroke();
-      
+
       // Right tentacle
       ctx.beginPath();
       ctx.moveTo(enemy.x + 5, enemy.y + 5);
@@ -2535,7 +2535,7 @@ function draw() {
       ctx.arc(enemy.x - 2.5, enemy.y - 5, 0.8, 0, Math.PI * 2);
       ctx.arc(enemy.x + 2.5, enemy.y - 5, 0.8, 0, Math.PI * 2);
       ctx.fill();
-    } 
+    }
     else if (enemy.type === 'dasher') {
       // 1. Sleeker aerodynamic spaceship saucer
       ctx.fillStyle = '#455a64';
@@ -2559,12 +2559,12 @@ function draw() {
       ctx.strokeStyle = '#26e600';
       ctx.lineWidth = 2.0;
       const swing = Math.sin((enemy.dashTimer || 0) * 0.08) * 2;
-      
+
       ctx.beginPath();
       ctx.moveTo(enemy.x - 6, enemy.y + 5);
       ctx.quadraticCurveTo(enemy.x - 12, enemy.y + 8, enemy.x - 14 + swing, enemy.y + 12);
       ctx.stroke();
-      
+
       ctx.beginPath();
       ctx.moveTo(enemy.x + 6, enemy.y + 5);
       ctx.quadraticCurveTo(enemy.x + 12, enemy.y + 8, enemy.x + 14 - swing, enemy.y + 12);
@@ -2632,12 +2632,12 @@ function draw() {
       ctx.strokeStyle = '#ff9800';
       ctx.lineWidth = 2.0;
       const wave = Math.sin((enemy.shootCooldown || 0) * 0.05) * 3;
-      
+
       ctx.beginPath();
       ctx.moveTo(enemy.x - 5, enemy.y + 5);
       ctx.quadraticCurveTo(enemy.x - 9 + wave, enemy.y + 11, enemy.x - 6, enemy.y + 15);
       ctx.stroke();
-      
+
       ctx.beginPath();
       ctx.moveTo(enemy.x + 5, enemy.y + 5);
       ctx.quadraticCurveTo(enemy.x + 9 - wave, enemy.y + 11, enemy.x + 6, enemy.y + 15);
@@ -2682,12 +2682,12 @@ function draw() {
       ctx.strokeStyle = '#00e5ff';
       ctx.lineWidth = 2.0;
       const wave = Math.sin((enemy.teleportCooldown || 0) * 0.05) * 3;
-      
+
       ctx.beginPath();
       ctx.moveTo(enemy.x - 5, enemy.y + 5);
       ctx.quadraticCurveTo(enemy.x - 9 + wave, enemy.y + 12, enemy.x - 6, enemy.y + 16);
       ctx.stroke();
-      
+
       ctx.beginPath();
       ctx.moveTo(enemy.x + 5, enemy.y + 5);
       ctx.quadraticCurveTo(enemy.x + 9 - wave, enemy.y + 12, enemy.x + 6, enemy.y + 16);
@@ -2818,7 +2818,7 @@ function draw() {
           ctx.arc(enemy.x + pos.dx, enemy.y + pos.dy, 2.5, 0, Math.PI * 2);
           ctx.fill();
         });
-      } 
+      }
       else if (subtype === 'kraken') {
         // --- 2. KRAKEN BOSS (Floor 2: Heavy Brass Tank + Yellow Kraken) ---
         // Spaceship base (Heavy angular spikes)
@@ -2884,14 +2884,14 @@ function draw() {
         ctx.arc(enemy.x - 12, enemy.y - 12, 4.5, 0, Math.PI * 2);
         ctx.arc(enemy.x + 12, enemy.y - 12, 4.5, 0, Math.PI * 2);
         ctx.fill();
-      } 
+      }
       else if (subtype === 'voidlord') {
         // --- 3. VOIDLORD BOSS (Floor 3: Sharp Star Cruiser + Purple Voidlord) ---
         // Star-shaped sharp black cruiser hull
         ctx.fillStyle = '#120b24'; // almost black deep purple
         ctx.strokeStyle = '#d500f9'; // neon violet
         ctx.lineWidth = 2.5;
-        
+
         ctx.beginPath();
         // Draw sharp star wings
         ctx.moveTo(enemy.x, enemy.y - 15);
@@ -2931,7 +2931,7 @@ function draw() {
           ctx.moveTo(enemy.x + i * 8, enemy.y + 15);
           ctx.quadraticCurveTo(enemy.x + i * 20 + wave * i, enemy.y + 35, enemy.x + i * 15 + wave * 0.5, enemy.y + 60);
           ctx.stroke();
-          
+
           // Glowing tips
           ctx.fillStyle = '#00e5ff';
           ctx.beginPath();
@@ -2966,16 +2966,16 @@ function draw() {
       const barH = 8;
       const barX = enemy.x - barW / 2;
       const barY = enemy.y - enemy.radius - 28;
-      
+
       // bg
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(barX, barY, barW, barH);
-      
+
       // fg
       const pct = Math.max(0, enemy.health / enemy.maxHealth);
       ctx.fillStyle = enemy.color;
       ctx.fillRect(barX, barY, barW * pct, barH);
-      
+
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 1;
       ctx.strokeRect(barX, barY, barW, barH);
@@ -2988,7 +2988,7 @@ function draw() {
   projectiles.forEach(p => {
     ctx.save();
     ctx.fillStyle = p.color;
-    
+
     // Draw triangular shards
     ctx.beginPath();
     ctx.moveTo(p.x, p.y - p.radius);
@@ -3012,7 +3012,7 @@ function draw() {
   // Draw Particles
   particles.forEach(p => {
     ctx.save();
-    
+
     const maxLife = p.initialLife || 1000;
     const alpha = Math.max(0, p.life / maxLife);
     ctx.globalAlpha = alpha;
@@ -3021,10 +3021,10 @@ function draw() {
       ctx.fillStyle = '#e0f7fa';
       ctx.strokeStyle = 'rgba(0, 240, 255, 0.5)';
       ctx.lineWidth = 1;
-      
+
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
-      
+
       ctx.beginPath();
       ctx.moveTo(0, -p.radius);
       ctx.lineTo(p.radius, p.radius);
@@ -3036,7 +3036,7 @@ function draw() {
       ctx.fillStyle = p.color;
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
-      
+
       ctx.beginPath();
       ctx.rect(-p.radius, -p.radius * 0.5, p.radius * 2, p.radius);
       ctx.fill();
@@ -3046,7 +3046,7 @@ function draw() {
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
       ctx.fill();
     }
-    
+
     ctx.restore();
   });
 
@@ -3081,7 +3081,7 @@ function drawGlassPlatform() {
   ctx.strokeStyle = currentFloor.gridColor;
   ctx.lineWidth = 1;
   const gridSize = 40;
-  
+
   for (let x = ARENA.x + gridSize; x < ARENA.x + ARENA.w; x += gridSize) {
     ctx.beginPath();
     ctx.moveTo(x, ARENA.y);
@@ -3121,7 +3121,7 @@ function drawDoors() {
     if (door.type === 'portal') {
       // Spinning galactic wormhole/portal in center
       door.angle += 0.03;
-      
+
       ctx.translate(door.x, door.y);
       ctx.rotate(door.angle);
 
@@ -3130,7 +3130,7 @@ function drawDoors() {
       grad.addColorStop(0.3, '#00f0ff');
       grad.addColorStop(0.7, '#ff007f');
       grad.addColorStop(1, 'transparent');
-      
+
       ctx.fillStyle = grad;
       ctx.beginPath();
       // Draw spiral shape
@@ -3190,10 +3190,10 @@ function resizeGame() {
 
   const scaleX = windowWidth / targetWidth;
   const scaleY = windowHeight / targetHeight;
-  
+
   // Choose the lower scale to fully fit the window, upscaling is allowed on larger screens
   const scale = Math.min(scaleX, scaleY);
-  
+
   // Apply the CSS scale transformation
   wrapper.style.transform = `scale(${scale})`;
   wrapper.style.transformOrigin = 'center';
@@ -3239,7 +3239,7 @@ function initTouchControls() {
     for (let i = 0; i < e.changedTouches.length; i++) {
       const touch = e.changedTouches[i];
       const coords = getContainerCoords(touch);
-      
+
       // Left half is movement joystick
       if (coords.x < window.innerWidth / 2) {
         if (!joystickLeft.active) {
@@ -3259,7 +3259,7 @@ function initTouchControls() {
             }
           }
         }
-      } 
+      }
       // Right half is shooting joystick
       else {
         if (!joystickRight.active) {
@@ -3307,7 +3307,7 @@ function initTouchControls() {
         if (leftKnob) {
           leftKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
         }
-      } 
+      }
       else if (joystickRight.active && touch.identifier === joystickRight.touchId) {
         let dx = coords.x - joystickRight.startX;
         let dy = coords.y - joystickRight.startY;
@@ -3344,7 +3344,7 @@ function initTouchControls() {
         if (leftJoy) {
           leftJoy.classList.remove('active');
         }
-      } 
+      }
       else if (joystickRight.active && touch.identifier === joystickRight.touchId) {
         joystickRight.active = false;
         joystickRight.touchId = null;
