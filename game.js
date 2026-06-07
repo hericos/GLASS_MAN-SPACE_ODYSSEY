@@ -410,7 +410,8 @@ const STATE = {
   PLAYING: 'playing',
   PAUSED: 'paused',
   GAMEOVER: 'gameover',
-  VICTORY: 'victory'
+  VICTORY: 'victory',
+  CHEAT: 'cheat'
 };
 
 const FLOORS = [
@@ -463,12 +464,52 @@ let screenShake = 0;
 let playerName = '';
 let playerId = localStorage.getItem('glassman_player_id') || null;
 
-// Pre-fill pilot name from localStorage
+// Combo System variables
+let comboCount = 0;
+let comboMultiplier = 1;
+let comboTimer = 0;
+
+// Cheat Easter Egg variables
+let healthBarClicks = 0;
+let healthBarClickTimeout = null;
+
+// Pre-fill pilot name from localStorage and initialize cheat menu hooks
 window.addEventListener('DOMContentLoaded', () => {
   const savedName = localStorage.getItem('glassman_player_name');
   const nameInput = document.getElementById('player-name-input');
   if (savedName && nameInput) {
     nameInput.value = savedName;
+  }
+  
+  // Initialize cheat items grid buttons
+  initCheatMenu();
+  
+  // Health Bar / Life HUD click detector for Easter Egg
+  const healthHud = document.getElementById('health-hud-panel');
+  if (healthHud) {
+    healthHud.addEventListener('click', () => {
+      if (gameState !== STATE.PLAYING) return;
+      if (!playerName || playerName.toLowerCase() !== 'easteregger') return;
+      
+      healthBarClicks++;
+      
+      clearTimeout(healthBarClickTimeout);
+      healthBarClickTimeout = setTimeout(() => {
+        healthBarClicks = 0;
+      }, 3000);
+      
+      if (healthBarClicks >= 10) {
+        healthBarClicks = 0;
+        clearTimeout(healthBarClickTimeout);
+        openCheatMenu();
+      }
+    });
+  }
+
+  // Cheat close button
+  const cheatCloseBtn = document.getElementById('cheat-close-btn');
+  if (cheatCloseBtn) {
+    cheatCloseBtn.addEventListener('click', closeCheatMenu);
   }
 });
 
@@ -574,6 +615,12 @@ async function submitScore(points) {
     return;
   }
   
+  // Protect the leaderboard by skipping saving scores for the cheat pilot name
+  if (playerName.toLowerCase() === 'easteregger') {
+    console.log("Cheat pilot name detected. Skipping score submission.");
+    return;
+  }
+  
   try {
     const response = await fetch('https://n8n.grupodailydeals.tech/webhook/salvar-pontuacao', {
       method: 'POST',
@@ -663,6 +710,24 @@ async function showLeaderboard() {
       });
     }
     
+    // Check if current player is in Top 10
+    const isInTop10 = top10.some(item => (item.userId && String(item.userId) === String(playerId)) || 
+                                         (item.name === playerName && (parseFloat(item.points) === score || score === 0)));
+    if (isInTop10 && score > 0) {
+      const titleEl = document.querySelector('#leaderboard-screen h2');
+      if (titleEl && !titleEl.innerHTML.includes('🎉')) {
+        titleEl.innerHTML = '🎉 VOCÊ ESTÁ NO TOP 10! 🎉';
+        titleEl.classList.add('glow-text-green');
+      }
+      spawnConfetti(WIDTH / 2, HEIGHT / 2, 60);
+    } else {
+      const titleEl = document.querySelector('#leaderboard-screen h2');
+      if (titleEl) {
+        titleEl.innerHTML = 'CLASSIFICAÇÃO GERAL';
+        titleEl.classList.remove('glow-text-green');
+      }
+    }
+
     loadingEl.classList.add('hidden');
     tableEl.classList.remove('hidden');
   } catch (error) {
@@ -789,8 +854,24 @@ function startGame() {
     shotCount: 1,
     luckFactor: 0.15,
     petCount: 0,
-    petAngle: 0
+    petAngle: 0,
+    
+    // New mechanics
+    hasShield: false,
+    tripleShotTimer: 0
   };
+
+  // Reset combo
+  comboCount = 0;
+  comboMultiplier = 1;
+  comboTimer = 0;
+  updateComboHUD();
+
+  // Hide record badges
+  const goBadge = document.getElementById('gameover-record-badge');
+  if (goBadge) goBadge.classList.add('hidden');
+  const vicBadge = document.getElementById('victory-record-badge');
+  if (vicBadge) vicBadge.classList.add('hidden');
 
   updateHUD();
   spawnRoomEnemies();
@@ -818,9 +899,109 @@ function resumeGame() {
   AudioSynth.init();
 }
 
+// --- Cheat Easter Egg Functions ---
+function openCheatMenu() {
+  if (gameState !== STATE.PLAYING) return;
+  if (!playerName || playerName.toLowerCase() !== 'easteregger') return;
+  gameState = STATE.CHEAT;
+  document.body.classList.remove('lock-scroll');
+  document.getElementById('cheat-screen').classList.remove('hidden');
+  const mobileControls = document.getElementById('mobile-controls');
+  if (mobileControls) mobileControls.classList.remove('visible');
+  const context = AudioSynth.getContext();
+  if (context && context.state !== 'suspended') {
+    context.suspend();
+  }
+}
+
+function closeCheatMenu() {
+  if (gameState !== STATE.CHEAT) return;
+  gameState = STATE.PLAYING;
+  document.body.classList.add('lock-scroll');
+  document.getElementById('cheat-screen').classList.add('hidden');
+  const mobileControls = document.getElementById('mobile-controls');
+  if (mobileControls) mobileControls.classList.add('visible');
+  AudioSynth.init();
+}
+
+function initCheatMenu() {
+  const grid = document.getElementById('cheat-items-grid');
+  if (!grid) return;
+  
+  grid.innerHTML = '';
+  const powerUps = [
+    { type: 'heart', label: 'Cristal de Vida', color: '#00f0ff' },
+    { type: 'damage', label: 'Estilhaço Afiado', color: '#ff007f' },
+    { type: 'speed', label: 'Polimento de Vidro', color: '#39ff14' },
+    { type: 'firerate', label: 'Vidro Temperado', color: '#ffeb3b' },
+    { type: 'range', label: 'Lente Côncava', color: '#00e5ff' },
+    { type: 'defense', label: 'Vidro Blindado', color: '#9c27b0' },
+    { type: 'helper', label: 'Mini Clone de Vidro', color: '#e91e63' },
+    { type: 'multishot', label: 'Estilhaço Múltiplo', color: '#ff5722' },
+    { type: 'luck', label: 'Cristal da Sorte', color: '#4caf50' },
+    { type: 'pet', label: 'Escudo Orbital', color: '#e040fb' },
+    { type: 'shield', label: 'Escudo de Vidro', color: '#00f0ff' },
+    { type: 'tripleshot', label: 'Tiro Triplo Temporal', color: '#e040fb' }
+  ];
+  
+  powerUps.forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'cheat-btn';
+    btn.style.borderColor = item.color;
+    btn.style.color = item.color;
+    btn.innerText = item.label;
+    btn.addEventListener('click', () => {
+      spawnCheatPowerUp(item.type);
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function spawnCheatPowerUp(type) {
+  if (gameState !== STATE.CHEAT || !player) return;
+  
+  // Calculate spawn coordinates close to the player
+  // Default offset: 45px to the right of the player, clamped inside ARENA
+  const offset = 45;
+  let spawnX = player.x + offset;
+  let spawnY = player.y;
+  
+  // Clamp coordinates within ARENA bounds with 20px padding from the walls
+  const minX = ARENA.x + 20;
+  const maxX = ARENA.x + ARENA.w - 20;
+  const minY = ARENA.y + 20;
+  const maxY = ARENA.y + ARENA.h - 20;
+  
+  if (spawnX > maxX) {
+    spawnX = player.x - offset; // Try left side
+  }
+  
+  // Final clamping
+  spawnX = Math.max(minX, Math.min(maxX, spawnX));
+  spawnY = Math.max(minY, Math.min(maxY, spawnY));
+  
+  // Spawn the item
+  spawnPowerUp(spawnX, spawnY, type);
+  
+  // Floating text feedback
+  addFloatText(spawnX, spawnY - 15, "MATERIALIZADO!", '#ff007f', 12);
+  
+  // Close the secret menu and resume gameplay
+  closeCheatMenu();
+}
+
 function triggerGameOver() {
   gameState = STATE.GAMEOVER;
   document.body.classList.remove('lock-scroll');
+  
+  // Check record before updating it
+  const isNewRecord = (score > highScore);
+  if (isNewRecord) {
+    const badge = document.getElementById('gameover-record-badge');
+    if (badge) badge.classList.remove('hidden');
+    spawnConfetti(WIDTH / 2, HEIGHT / 2, 80);
+  }
+
   checkAndSaveRecords();
   document.getElementById('final-score').innerText = score;
   document.getElementById('final-rooms').innerText = (floorIndex - 1) * 3 + roomIndex - 1;
@@ -837,6 +1018,15 @@ function triggerGameOver() {
 function triggerVictory() {
   gameState = STATE.VICTORY;
   document.body.classList.remove('lock-scroll');
+  
+  // Check record before updating it
+  const isNewRecord = (score > highScore);
+  if (isNewRecord) {
+    const badge = document.getElementById('victory-record-badge');
+    if (badge) badge.classList.remove('hidden');
+    spawnConfetti(WIDTH / 2, HEIGHT / 2, 80);
+  }
+
   checkAndSaveRecords();
   document.getElementById('victory-score').innerText = score;
   document.getElementById('victory-kills').innerText = Math.floor(score / 50);
@@ -1011,7 +1201,42 @@ function createDoors() {
 
 // --- Game Logic Updates ---
 function update(dt) {
-  if (gameState !== STATE.PLAYING) return;
+  if (gameState !== STATE.PLAYING) {
+    // Update particles (e.g. confetti, end-game effects)
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.angle += p.va || 0;
+      if (p.type === 'confetti') {
+        p.vy += 0.08; // gravity
+      }
+      p.life -= dt;
+    });
+    particles = particles.filter(p => p.life > 0);
+    
+    // Update float texts
+    floatTexts.forEach(t => {
+      t.y -= 0.5;
+      t.life -= dt;
+    });
+    floatTexts = floatTexts.filter(t => t.life > 0);
+    return;
+  }
+
+  // Decrement power-up timers
+  if (player.tripleShotTimer && player.tripleShotTimer > 0) {
+    player.tripleShotTimer -= dt;
+  }
+
+  // Decrement combo timer
+  if (comboTimer > 0) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) {
+      comboCount = 0;
+      comboMultiplier = 1;
+      updateComboHUD();
+    }
+  }
 
   // Invulnerability frames cooldown
   if (player.invulFrames > 0) {
@@ -1336,9 +1561,20 @@ function update(dt) {
 
         if (enemy.health <= 0) {
           // Kill enemy
-          score += enemy.value;
+          comboCount++;
+          comboTimer = 3000; // 3 seconds combo window
+          comboMultiplier = Math.min(5, 1 + Math.floor(comboCount / 3));
+          updateComboHUD();
+
+          const pointsEarned = enemy.value * comboMultiplier;
+          score += pointsEarned;
           updateHUD();
-          addFloatText(enemy.x, enemy.y - 20, `+${enemy.value}`, enemy.color, 18);
+          
+          addFloatText(enemy.x, enemy.y - 20, `+${pointsEarned}`, enemy.color, 18);
+          if (comboMultiplier > 1) {
+            addFloatText(enemy.x, enemy.y - 35, `Combo x${comboMultiplier}!`, '#ff007f', 13);
+          }
+          
           spawnSlimeParticles(enemy.x, enemy.y, 15, enemy.color, true);
           
           if (enemy.isBoss) {
@@ -1348,8 +1584,9 @@ function update(dt) {
             spawnPowerUp(enemy.x, enemy.y);
           } else {
             AudioSynth.play('enemy_death');
-            // Small chance of powerup drop
-            if (Math.random() < 0.15) {
+            // Powerup drop chance scales with player's luckFactor
+            const dropChance = (player && typeof player.luckFactor === 'number') ? player.luckFactor : 0.15;
+            if (Math.random() < dropChance) {
               spawnPowerUp(enemy.x, enemy.y);
             }
           }
@@ -1445,8 +1682,9 @@ function update(dt) {
 // --- Shooting & Damage functions ---
 function fireProjectile(vx, vy) {
   const baseAngle = Math.atan2(vy, vx);
+  const isTriple = player.tripleShotTimer > 0;
   
-  if (player.shotCount === 1) {
+  if (player.shotCount === 1 && !isTriple) {
     projectiles.push({
       x: player.x,
       y: player.y,
@@ -1460,7 +1698,7 @@ function fireProjectile(vx, vy) {
     });
   } else {
     const spread = 0.22; // angle step
-    const count = player.shotCount;
+    const count = player.shotCount * (isTriple ? 3 : 1);
     const startAngle = baseAngle - ((count - 1) * spread) / 2;
     for (let i = 0; i < count; i++) {
       const angle = startAngle + i * spread;
@@ -1473,7 +1711,7 @@ function fireProjectile(vx, vy) {
         damage: player.damage,
         life: player.range / player.bulletSpeed * 10,
         bounces: 1, // Shards bounce once
-        color: '#e0f7fa'
+        color: isTriple ? '#ff007f' : '#e0f7fa' // Pink/magenta shards for Triple Shot!
       });
     }
   }
@@ -1684,6 +1922,37 @@ function executeBossAttack(boss) {
 function damagePlayer(amount = 1) {
   if (player.invulFrames > 0) return;
 
+  if (player.hasShield) {
+    player.hasShield = false;
+    player.invulFrames = 600; // 0.6s invulnerability
+    screenShake = 6;
+    addFloatText(player.x, player.y - 25, "Escudo Bloqueou!", '#00f0ff', 16);
+    spawnGlassParticles(player.x, player.y, 15, 0, 0, true);
+    AudioSynth.play('shatter');
+    
+    // Shoot shards in 8 directions
+    for (let a = 0; a < 8; a++) {
+      const angle = (a / 8) * Math.PI * 2;
+      projectiles.push({
+        x: player.x,
+        y: player.y,
+        vx: Math.cos(angle) * player.bulletSpeed,
+        vy: Math.sin(angle) * player.bulletSpeed,
+        radius: 4,
+        damage: player.damage * 1.5,
+        life: player.range / player.bulletSpeed * 10,
+        bounces: 1,
+        color: '#00f0ff'
+      });
+    }
+    return;
+  }
+
+  // Reset combo on taking damage
+  comboCount = 0;
+  comboMultiplier = 1;
+  updateComboHUD();
+
   const finalDamage = amount * (1 + (floorIndex - 1) * 0.25);
   player.health -= finalDamage;
   player.invulFrames = 1200; // 1.2s invulnerability
@@ -1706,9 +1975,9 @@ function damagePlayer(amount = 1) {
 }
 
 // --- Items & Power-ups ---
-function spawnPowerUp(x, y) {
-  const types = ['heart', 'damage', 'speed', 'firerate', 'range', 'defense', 'helper', 'multishot', 'luck', 'pet'];
-  const type = types[Math.floor(Math.random() * types.length)];
+function spawnPowerUp(x, y, specificType = null) {
+  const types = ['heart', 'damage', 'speed', 'firerate', 'range', 'defense', 'helper', 'multishot', 'luck', 'pet', 'shield', 'tripleshot'];
+  const type = specificType || types[Math.floor(Math.random() * types.length)];
   
   let color = '#fff';
   let label = '';
@@ -1723,6 +1992,8 @@ function spawnPowerUp(x, y) {
   else if (type === 'multishot') { color = '#ff5722'; label = 'Estilhaço Múltiplo'; }
   else if (type === 'luck') { color = '#4caf50'; label = 'Cristal da Sorte'; }
   else if (type === 'pet') { color = '#e040fb'; label = 'Escudo Orbital'; }
+  else if (type === 'shield') { color = '#00f0ff'; label = 'Escudo de Vidro'; }
+  else if (type === 'tripleshot') { color = '#e040fb'; label = 'Tiro Triplo Temporal'; }
 
   items.push({
     x, y,
@@ -1769,6 +2040,12 @@ function applyItem(item) {
   } else if (item.type === 'pet') {
     player.petCount += 1;
     addFloatText(player.x, player.y - 20, "+Escudo Orbital", item.color, 16);
+  } else if (item.type === 'shield') {
+    player.hasShield = true;
+    addFloatText(player.x, player.y - 20, "+Escudo de Vidro", item.color, 16);
+  } else if (item.type === 'tripleshot') {
+    player.tripleShotTimer = 10000; // 10s
+    addFloatText(player.x, player.y - 20, "+Tiro Triplo", item.color, 16);
   }
   
   player.crackedAmount = 1 - (player.health / player.maxHealth);
@@ -1795,9 +2072,13 @@ function updateHUD() {
       barFill.style.background = 'linear-gradient(90deg, #ff007f 0%, #d50000 100%)';
     }
   }
+}
 
-  // Display projectile damage count or general details
-  document.getElementById('shard-count').innerText = `x${player.damage}`;
+function updateComboHUD() {
+  const val = document.getElementById('combo-val');
+  if (val) {
+    val.innerText = `x${comboMultiplier}`;
+  }
 }
 
 // --- Floating Text Helpers ---
@@ -1816,6 +2097,7 @@ function spawnGlassParticles(x, y, count, baseVx, baseVy, isBig = false) {
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = (isBig ? 2 : 1) + Math.random() * (isBig ? 4 : 2.5);
+    const life = 500 + Math.random() * 500;
     particles.push({
       x, y,
       vx: (baseVx || 0) + Math.cos(angle) * speed,
@@ -1823,7 +2105,8 @@ function spawnGlassParticles(x, y, count, baseVx, baseVy, isBig = false) {
       va: (Math.random() - 0.5) * 0.1, // angular speed
       angle: Math.random() * Math.PI,
       radius: (isBig ? 5 : 2) + Math.random() * (isBig ? 6 : 4),
-      life: 500 + Math.random() * 500,
+      life,
+      initialLife: life,
       type: 'glass'
     });
   }
@@ -1833,14 +2116,37 @@ function spawnSlimeParticles(x, y, count, color, isExplosion = false) {
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 0.5 + Math.random() * (isExplosion ? 4.5 : 2);
+    const life = 400 + Math.random() * 400;
     particles.push({
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       radius: 2 + Math.random() * (isExplosion ? 6 : 3),
-      life: 400 + Math.random() * 400,
+      life,
+      initialLife: life,
       type: 'slime',
       color
+    });
+  }
+}
+
+function spawnConfetti(x, y, count) {
+  const colors = ['#00f0ff', '#ff007f', '#39ff14', '#ffeb3b', '#ff9800', '#e040fb'];
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 5;
+    const life = 1500 + Math.random() * 1000;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 1.5, // slightly upwards
+      va: (Math.random() - 0.5) * 0.2, // rotation speed
+      angle: Math.random() * Math.PI,
+      radius: 3 + Math.random() * 5,
+      life,
+      initialLife: life,
+      type: 'confetti',
+      color: colors[Math.floor(Math.random() * colors.length)]
     });
   }
 }
@@ -2009,8 +2315,8 @@ function draw() {
 
     // 6. Draw Cracks inside head & torso if damage taken
     if (player.crackedAmount > 0) {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.82)';
+      ctx.lineWidth = 1.1;
       ctx.beginPath();
       
       const seedRandom = (seed) => {
@@ -2018,19 +2324,52 @@ function draw() {
         return x - Math.floor(x);
       };
       
-      const crackCount = Math.floor(player.crackedAmount * 9);
-      for (let j = 0; j < crackCount; j++) {
-        // Draw some cracks starting on torso
-        ctx.moveTo(player.x, player.y);
-        let ang = seedRandom(j) * Math.PI * 2;
-        let len = 10 * (0.3 + seedRandom(j + 1) * 0.7);
-        ctx.lineTo(player.x + Math.cos(ang) * len, player.y + Math.sin(ang) * len);
+      const crackLines = Math.floor(player.crackedAmount * 8);
+      for (let j = 0; j < crackLines; j++) {
+        // Torso cracks (branching & jagged)
+        ctx.moveTo(player.x, player.y - 1);
+        let cx = player.x;
+        let cy = player.y - 1;
+        let ang = seedRandom(j * 4) * Math.PI * 2;
+        let segments = 2 + Math.floor(seedRandom(j * 4 + 1) * 2);
+        for (let s = 0; s < segments; s++) {
+          let len = (14 / segments) * (0.5 + seedRandom(j * 4 + s + 2) * 0.6);
+          ang += (seedRandom(j * 4 + s + 3) - 0.5) * 0.7; // angle variation
+          cx += Math.cos(ang) * len;
+          cy += Math.sin(ang) * len;
+          ctx.lineTo(cx, cy);
+          
+          // Small branch
+          if (seedRandom(j * 4 + s + 7) > 0.6) {
+            ctx.moveTo(cx, cy);
+            let branchAng = ang + (seedRandom(j * 4 + s + 8) - 0.5) * 1.5;
+            let branchLen = len * 0.7;
+            ctx.lineTo(cx + Math.cos(branchAng) * branchLen, cy + Math.sin(branchAng) * branchLen);
+            ctx.moveTo(cx, cy);
+          }
+        }
         
-        // Draw some cracks starting on head
+        // Head cracks (branching & jagged)
         ctx.moveTo(player.x, player.y - 14);
-        ang = seedRandom(j + 10) * Math.PI * 2;
-        len = 6 * (0.2 + seedRandom(j + 11) * 0.8);
-        ctx.lineTo(player.x + Math.cos(ang) * len, (player.y - 14) + Math.sin(ang) * len);
+        cx = player.x;
+        cy = player.y - 14;
+        ang = seedRandom(j * 4 + 10) * Math.PI * 2;
+        segments = 2;
+        for (let s = 0; s < segments; s++) {
+          let len = (8 / segments) * (0.4 + seedRandom(j * 4 + s + 11) * 0.6);
+          ang += (seedRandom(j * 4 + s + 12) - 0.5) * 0.7;
+          cx += Math.cos(ang) * len;
+          cy += Math.sin(ang) * len;
+          ctx.lineTo(cx, cy);
+          
+          if (seedRandom(j * 4 + s + 15) > 0.65) {
+            ctx.moveTo(cx, cy);
+            let branchAng = ang + (seedRandom(j * 4 + s + 16) - 0.5) * 1.3;
+            let branchLen = len * 0.6;
+            ctx.lineTo(cx + Math.cos(branchAng) * branchLen, cy + Math.sin(branchAng) * branchLen);
+            ctx.moveTo(cx, cy);
+          }
+        }
       }
       ctx.stroke();
     }
@@ -2040,6 +2379,21 @@ function draw() {
     ctx.beginPath();
     ctx.arc(player.x, player.y - 1, 3.5, 0, Math.PI * 2);
     ctx.fill();
+
+    // 6.5 Draw Glass Shield bubble if active
+    if (player.hasShield) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
+      ctx.shadowColor = '#00f0ff';
+      ctx.shadowBlur = 12;
+      ctx.lineWidth = 1.8;
+      ctx.fillStyle = 'rgba(0, 240, 255, 0.08)';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y - 4, player.radius + 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // 7. Draw Pets (Shield orbitals)
     for (let i = 0; i < player.petCount; i++) {
@@ -2659,7 +3013,8 @@ function draw() {
   particles.forEach(p => {
     ctx.save();
     
-    const alpha = Math.max(0, p.life / 1000);
+    const maxLife = p.initialLife || 1000;
+    const alpha = Math.max(0, p.life / maxLife);
     ctx.globalAlpha = alpha;
 
     if (p.type === 'glass') {
@@ -2677,6 +3032,14 @@ function draw() {
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+    } else if (p.type === 'confetti') {
+      ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      
+      ctx.beginPath();
+      ctx.rect(-p.radius, -p.radius * 0.5, p.radius * 2, p.radius);
+      ctx.fill();
     } else {
       ctx.fillStyle = p.color;
       ctx.beginPath();

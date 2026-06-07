@@ -23,15 +23,19 @@
       <!-- Heads-Up Display (HUD) -->
       <div id="hud" class="hidden">
         <div class="hud-left">
-          <div class="hud-panel glass">
+          <div id="health-hud-panel" class="hud-panel glass">
             <div class="hud-label">LIFE</div>
             <div id="health-bar-container">
               <div id="health-bar-fill"></div>
             </div>
           </div>
-          <div class="hud-panel glass">
-            <div class="hud-label">SHARDS</div>
-            <div id="shard-count">0</div>
+          <div id="combo-panel" class="hud-panel glass"
+            style="border-color: var(--neon-magenta); box-shadow: 0 0 15px var(--neon-magenta-glow);">
+            <div class="hud-label" style="color: var(--neon-magenta); text-shadow: 0 0 5px var(--neon-magenta-glow);">
+              COMBO</div>
+            <div id="combo-val"
+              style="color: #fff; font-size: 1.25rem; font-weight: 900; text-shadow: 0 0 10px var(--neon-magenta-glow);">
+              x1</div>
           </div>
         </div>
 
@@ -40,12 +44,13 @@
         </div>
 
         <div class="hud-right">
+
           <div class="hud-panel glass">
             <div class="hud-label">SCORE</div>
             <div id="score-val">000000</div>
           </div>
           <div class="hud-panel glass">
-            <div class="hud-label">TANDEM</div>
+            <div class="hud-label">ANDAR</div>
             <div id="floor-val">PISO 1</div>
           </div>
         </div>
@@ -107,7 +112,7 @@
 
           <button id="start-btn" class="glow-btn">INICIAR JORNADA</button>
         </div>
-        <div class="version-tag">v1.0.1</div>
+        <div class="version-tag">v1.1.0</div>
       </div>
 
       <!-- Game Over Screen -->
@@ -119,6 +124,7 @@
             <div>Pontuação: <span id="final-score">0</span></div>
             <div>Salas Superadas: <span id="final-rooms">0</span></div>
           </div>
+          <div id="gameover-record-badge" class="record-badge hidden">NOVO RECORDE PESSOAL!</div>
           <button id="restart-btn" class="glow-btn danger-btn">VER CLASSIFICAÇÃO</button>
         </div>
       </div>
@@ -132,6 +138,7 @@
             <div>Pontuação Final: <span id="victory-score">0</span></div>
             <div>Inimigos Eliminados: <span id="victory-kills">0</span></div>
           </div>
+          <div id="victory-record-badge" class="record-badge success hidden">NOVO RECORDE PESSOAL!</div>
           <button id="victory-restart-btn" class="glow-btn success-btn">VER CLASSIFICAÇÃO</button>
         </div>
       </div>
@@ -160,6 +167,24 @@
           </div>
 
           <button id="leaderboard-close-btn" class="glow-btn" style="margin-top: 25px;">JOGAR NOVAMENTE</button>
+        </div>
+      </div>
+
+      <!-- Cheat Screen (Easter Egg) -->
+      <div id="cheat-screen" class="overlay flex-center hidden" style="z-index: 35;">
+        <div class="modal glass animate-fade-in" style="max-width: 450px;">
+          <h2 class="glow-text" style="color: var(--neon-cyan); font-size: 1.8rem; letter-spacing: 2px;">PAINEL SECRETO
+          </h2>
+          <p style="font-size: 0.9rem; margin-bottom: 20px; color: rgba(255,255,255,0.7);">Selecione um item para
+            materializar na arena:</p>
+
+          <div id="cheat-items-grid"
+            style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-height: 250px; overflow-y: auto; padding-right: 5px; margin-bottom: 20px;">
+            <!-- Dynamically populated buttons -->
+          </div>
+
+          <button id="cheat-close-btn" class="glow-btn" style="padding: 10px 30px; font-size: 0.95rem;">FECHAR
+            PAINEL</button>
         </div>
       </div>
 
