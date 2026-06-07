@@ -22,21 +22,30 @@
 body, html {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  overflow: auto;
   background-color: var(--bg-dark);
   font-family: var(--font-body);
   color: #ffffff;
 }
 
+body.lock-scroll, body.lock-scroll html {
+  overflow: hidden !important;
+}
+
+body.lock-scroll #game-container {
+  overflow: hidden !important;
+  height: 100vh;
+}
+
 #game-container {
   position: relative;
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
   background: radial-gradient(circle at center, #111b3d 0%, #03050c 100%);
-  overflow: hidden;
+  overflow: auto;
 }
 
 #game-wrapper {
@@ -605,4 +614,190 @@ body, html {
   border: 1px solid rgba(255, 0, 127, 0.7);
   box-shadow: 0 0 10px rgba(255, 0, 127, 0.5);
 }
+
+/* Player Name Input styling */
+.name-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 25px;
+}
+
+.name-input-container label {
+  font-family: var(--font-title);
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 5px var(--neon-cyan-glow);
+  font-weight: bold;
+}
+
+#player-name-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 12px 20px;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  color: #ffffff;
+  outline: none;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+#player-name-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+#player-name-input:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 15px var(--neon-cyan-glow);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.error-msg {
+  color: #ff3366;
+  font-size: 0.8rem;
+  margin-top: 5px;
+  font-family: var(--font-body);
+  text-align: center;
+}
+
+.input-error {
+  border-color: #ff3366 !important;
+  box-shadow: 0 0 10px rgba(255, 51, 102, 0.4) !important;
+}
+
+/* Leaderboard Screen styling */
+#leaderboard-screen {
+  background-color: rgba(3, 4, 10, 0.92);
+}
+
+.leaderboard-table-container {
+  width: 100%;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 15px 0;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-family: var(--font-body);
+}
+
+.leaderboard-table th, .leaderboard-table td {
+  padding: 12px 15px;
+}
+
+.leaderboard-table th {
+  font-family: var(--font-title);
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  color: var(--neon-cyan);
+  border-bottom: 2px solid var(--glass-border);
+  background: rgba(0, 240, 255, 0.05);
+  position: sticky;
+  top: 0;
+}
+
+.leaderboard-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.3s;
+}
+
+.leaderboard-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.leaderboard-table tr.current-player-row {
+  background: rgba(0, 240, 255, 0.15);
+  border-left: 3px solid var(--neon-cyan);
+  font-weight: bold;
+}
+
+.leaderboard-table tr.current-player-row td {
+  color: #ffffff;
+  text-shadow: 0 0 5px var(--neon-cyan-glow);
+}
+
+.rank-col {
+  width: 15%;
+  font-family: var(--font-title);
+  font-weight: bold;
+  text-align: center;
+}
+
+.name-col {
+  width: 55%;
+  text-align: left;
+}
+
+.points-col {
+  width: 30%;
+  font-family: var(--font-title);
+  text-align: right;
+  color: var(--neon-green);
+  text-shadow: 0 0 5px var(--neon-green-glow);
+}
+
+/* Loading Spinner */
+.loading-spinner {
+  font-family: var(--font-title);
+  color: var(--neon-cyan);
+  text-shadow: 0 0 10px var(--neon-cyan-glow);
+  padding: 30px;
+  text-align: center;
+  animation: pulse-loading 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-loading {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Compact start-screen modal to fit in the 600px height limit */
+#start-screen .modal {
+  padding: 20px 40px;
+}
+
+#start-screen .modal h1 {
+  font-size: 2.5rem;
+  margin-bottom: 2px;
+}
+
+#start-screen .subtitle {
+  margin-bottom: 12px;
+}
+
+#start-screen .author-credits {
+  margin-bottom: 12px;
+  margin-top: -10px;
+}
+
+#start-screen .record-box {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+}
+
+#start-screen .instructions {
+  margin-bottom: 12px;
+  padding: 10px 15px;
+}
+
+#start-screen .volume-settings {
+  margin-bottom: 12px;
+  padding: 8px 15px;
+}
+
+#start-screen .name-input-container {
+  margin-bottom: 12px;
+}
+
+
 

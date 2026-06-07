@@ -459,6 +459,19 @@ let score = 0;
 let roomCleared = false;
 let screenShake = 0;
 
+// Player Ranking and Registration session variables
+let playerName = '';
+let playerId = localStorage.getItem('glassman_player_id') || null;
+
+// Pre-fill pilot name from localStorage
+window.addEventListener('DOMContentLoaded', () => {
+  const savedName = localStorage.getItem('glassman_player_name');
+  const nameInput = document.getElementById('player-name-input');
+  if (savedName && nameInput) {
+    nameInput.value = savedName;
+  }
+});
+
 // Records / High Scores (Persisted via LocalStorage)
 let highScore = parseInt(localStorage.getItem('glassman_high_score') || '0');
 let maxFloor = parseInt(localStorage.getItem('glassman_max_floor') || '1');
@@ -528,17 +541,202 @@ window.addEventListener('blur', () => {
   keys = {};
 });
 
+// --- Ranking & Registration Webhooks ---
+async function registerPlayer(name) {
+  playerName = name.trim();
+  try {
+    const response = await fetch('https://n8n.grupodailydeals.tech/webhook-test/novo-jogador', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ name: playerName })
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    playerId = data.id || data.userId || 'fallback-' + Math.random().toString(36).substr(2, 9);
+    console.log("Player registered with ID:", playerId);
+    localStorage.setItem('glassman_player_id', playerId);
+  } catch (error) {
+    console.error("Failed to register player:", error);
+    // Use fallback ID
+    playerId = localStorage.getItem('glassman_player_id') || 'local_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('glassman_player_id', playerId);
+    console.log("Using fallback ID:", playerId);
+  }
+}
+
+async function submitScore(points) {
+  if (!playerName || !playerId) {
+    console.warn("Player name or ID not set. Cannot submit score.");
+    return;
+  }
+  
+  try {
+    const response = await fetch('https://n8n.grupodailydeals.tech/webhook/salvar-pontuacao', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: playerName,
+        userId: playerId,
+        points: points
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    console.log("Score submitted successfully");
+  } catch (error) {
+    console.error("Failed to submit score:", error);
+  }
+}
+
+async function showLeaderboard() {
+  // Hide other overlays
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('game-over-screen').classList.add('hidden');
+  document.getElementById('victory-screen').classList.add('hidden');
+  document.getElementById('pause-screen').classList.add('hidden');
+  
+  // Show leaderboard screen
+  const lbScreen = document.getElementById('leaderboard-screen');
+  lbScreen.classList.remove('hidden');
+  
+  const loadingEl = document.getElementById('leaderboard-loading');
+  const tableEl = document.getElementById('leaderboard-container');
+  const tbody = document.getElementById('leaderboard-body');
+  
+  loadingEl.classList.remove('hidden');
+  loadingEl.innerHTML = 'Carregando ranking...';
+  tableEl.classList.add('hidden');
+  tbody.innerHTML = '';
+  
+  try {
+    const response = await fetch('https://n8n.grupodailydeals.tech/webhook/ranking');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    
+    // Sort descending by points
+    data.sort((a, b) => {
+      const pA = parseFloat(a.points) || 0;
+      const pB = parseFloat(b.points) || 0;
+      return pB - pA;
+    });
+    
+    // Take Top 10
+    const top10 = data.slice(0, 10);
+    
+    // Render rows
+    if (top10.length === 0) {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td colspan="3" style="text-align: center;">Nenhuma pontuação registrada ainda.</td>`;
+      tbody.appendChild(row);
+    } else {
+      top10.forEach((item, index) => {
+        const row = document.createElement('tr');
+        
+        // Highlight current player's entry if matching
+        const isCurrentPlayer = (item.userId && String(item.userId) === String(playerId)) || 
+                                (item.name === playerName && (parseFloat(item.points) === score || score === 0));
+        if (isCurrentPlayer) {
+          row.classList.add('current-player-row');
+        }
+        
+        const rank = index + 1;
+        let rankBadge = `${rank}`;
+        if (rank === 1) rankBadge = '🥇';
+        else if (rank === 2) rankBadge = '🥈';
+        else if (rank === 3) rankBadge = '🥉';
+        
+        row.innerHTML = `
+          <td class="rank-col">${rankBadge}</td>
+          <td class="name-col">${escapeHTML(item.name)}</td>
+          <td class="points-col">${item.points}</td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+    
+    loadingEl.classList.add('hidden');
+    tableEl.classList.remove('hidden');
+  } catch (error) {
+    console.error("Failed to load ranking:", error);
+    loadingEl.innerHTML = `<span class="danger-text">Erro ao carregar ranking.</span><br><button id="leaderboard-retry-btn" class="glow-btn" style="margin-top: 15px; padding: 10px 20px;">Tentar Novamente</button>`;
+    
+    const retryBtn = document.getElementById('leaderboard-retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', showLeaderboard);
+    }
+  }
+}
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return str.replace(/[&<>'"]/g, 
+    tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+  );
+}
+
 // Click handlers for UI Buttons
 document.getElementById('start-btn').addEventListener('click', () => {
-  AudioSynth.init();
-  startGame();
+  const nameInput = document.getElementById('player-name-input');
+  const nameError = document.getElementById('name-error-msg');
+  const startBtn = document.getElementById('start-btn');
+  
+  if (!nameInput || !nameInput.value.trim()) {
+    if (nameError) nameError.classList.remove('hidden');
+    if (nameInput) nameInput.classList.add('input-error');
+    const startModal = document.querySelector('#start-screen .modal');
+    if (startModal) {
+      startModal.classList.remove('animate-fade-in');
+      void startModal.offsetWidth; // Trigger reflow
+      startModal.classList.add('animate-shake');
+    }
+    return;
+  }
+  
+  if (nameError) nameError.classList.add('hidden');
+  if (nameInput) nameInput.classList.remove('input-error');
+  
+  const selectedName = nameInput.value.trim();
+  localStorage.setItem('glassman_player_name', selectedName);
+  
+  // Show loading state
+  startBtn.disabled = true;
+  startBtn.innerText = "REGISTRANDO PILOTO...";
+  nameInput.disabled = true;
+  
+  registerPlayer(selectedName).then(() => {
+    startBtn.disabled = false;
+    startBtn.innerText = "INICIAR JORNADA";
+    nameInput.disabled = false;
+    AudioSynth.init();
+    startGame();
+  });
 });
 
 document.getElementById('restart-btn').addEventListener('click', () => {
-  startGame();
+  showLeaderboard();
 });
 
 document.getElementById('victory-restart-btn').addEventListener('click', () => {
+  showLeaderboard();
+});
+
+document.getElementById('leaderboard-close-btn').addEventListener('click', () => {
+  document.getElementById('leaderboard-screen').classList.add('hidden');
   startGame();
 });
 
@@ -555,6 +753,7 @@ function startGame() {
   if (mobileControls) mobileControls.classList.add('visible');
 
   gameState = STATE.PLAYING;
+  document.body.classList.add('lock-scroll');
   score = 0;
   roomIndex = 1;
   floorIndex = 1;
@@ -600,6 +799,7 @@ function startGame() {
 
 function pauseGame() {
   gameState = STATE.PAUSED;
+  document.body.classList.remove('lock-scroll');
   document.getElementById('pause-screen').classList.remove('hidden');
   const mobileControls = document.getElementById('mobile-controls');
   if (mobileControls) mobileControls.classList.remove('visible');
@@ -611,6 +811,7 @@ function pauseGame() {
 
 function resumeGame() {
   gameState = STATE.PLAYING;
+  document.body.classList.add('lock-scroll');
   document.getElementById('pause-screen').classList.add('hidden');
   const mobileControls = document.getElementById('mobile-controls');
   if (mobileControls) mobileControls.classList.add('visible');
@@ -619,6 +820,7 @@ function resumeGame() {
 
 function triggerGameOver() {
   gameState = STATE.GAMEOVER;
+  document.body.classList.remove('lock-scroll');
   checkAndSaveRecords();
   document.getElementById('final-score').innerText = score;
   document.getElementById('final-rooms').innerText = (floorIndex - 1) * 3 + roomIndex - 1;
@@ -627,10 +829,14 @@ function triggerGameOver() {
   if (mobileControls) mobileControls.classList.remove('visible');
   AudioSynth.stopMusic();
   AudioSynth.play('shatter');
+  
+  // Submit score in background
+  submitScore(score);
 }
 
 function triggerVictory() {
   gameState = STATE.VICTORY;
+  document.body.classList.remove('lock-scroll');
   checkAndSaveRecords();
   document.getElementById('victory-score').innerText = score;
   document.getElementById('victory-kills').innerText = Math.floor(score / 50);
@@ -639,6 +845,9 @@ function triggerVictory() {
   if (mobileControls) mobileControls.classList.remove('visible');
   AudioSynth.stopMusic();
   AudioSynth.play('powerup');
+  
+  // Submit score in background
+  submitScore(score);
 }
 
 // --- Spawning & Rooms ---
@@ -1128,6 +1337,7 @@ function update(dt) {
         if (enemy.health <= 0) {
           // Kill enemy
           score += enemy.value;
+          updateHUD();
           addFloatText(enemy.x, enemy.y - 20, `+${enemy.value}`, enemy.color, 18);
           spawnSlimeParticles(enemy.x, enemy.y, 15, enemy.color, true);
           
